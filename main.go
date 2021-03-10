@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -94,27 +95,39 @@ func Untar(src string, dest string) error {
 				if err == io.EOF {
 					break
 				}
-				switch fileheader.Typeflag {
-				case tar.TypeReg:
+				if header.Typeflag == tar.TypeReg {
+
 					targetFile := filepath.Join(targetFolder, fileheader.Name)
 					fmt.Println(targetFile)
-					cut := strings.LastIndex(targetFile, "\\")
-					err = os.MkdirAll(targetFile[0:cut], 0755)
 
-					if _, err := os.Stat("targetFile"); os.IsNotExist(err) {
-						// path/to/whatever does not exist
+					cut := -1
+					if runtime.GOOS == "windows" {
+						cut = strings.LastIndex(targetFile, "\\")
 
-						file, err := os.OpenFile(targetFile, os.O_CREATE|os.O_RDWR, os.FileMode(fileheader.Mode))
-						if err != nil {
-							return err
-						}
+					} else {
 
-						// copy over contents
-						if _, err := io.Copy(file, fileGZReader); err != nil {
-							return err
-						}
+						cut = strings.LastIndex(targetFile, "/")
 					}
 
+					if cut == -1 {
+						fmt.Println("Error: no path separator in filepath for: " + targetFile)
+					} else {
+						err = os.MkdirAll(targetFile[0:cut], 0755)
+
+						if _, err := os.Stat("targetFile"); os.IsNotExist(err) {
+							// path/to/whatever does not exist
+
+							file, err := os.OpenFile(targetFile, os.O_CREATE|os.O_RDWR, os.FileMode(fileheader.Mode))
+							if err != nil {
+								return err
+							}
+
+							// copy over contents
+							if _, err := io.Copy(file, fileGZReader); err != nil {
+								return err
+							}
+						}
+					}
 				}
 
 			}
